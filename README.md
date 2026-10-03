@@ -83,13 +83,36 @@ GROQ_API_KEY=gsk_your_actual_groq_api_key_here
 GROQ_MODEL=llama-3.3-70b-versatile
 ```
 
-### 2. Start Local Mock Services
+### 2. Start Local Mock Services & Web Control Dashboard
 
-In Terminal 1, launch both mock application servers (Vendor Portal on port 8001, Internal Finance System on port 8002):
+In Terminal 1, launch the mock application servers and Web Control Panel:
 
 ```bash
 python -m mock_apps.run_servers
 ```
+
+Access the interfaces in your browser:
+- 🚀 **Control Dashboard**: `http://127.0.0.1:8000` (Run tasks via Web UI)
+- 🏢 **Vendor Portal (Mock)**: `http://127.0.0.1:8001` (`admin` / `password123`)
+- 💼 **Internal Finance System**: `http://127.0.0.1:8002`
+
+---
+
+## 🐳 Deployment (Docker & Cloud)
+
+### Option A: 1-Command Local Container Deployment
+
+```bash
+docker-compose up --build
+```
+Open `http://localhost:8000` to interact with the Task Worker Web UI.
+
+### Option B: Cloud Deployment (Render / Railway / Fly.io / AWS EC2)
+
+1. Connect your GitHub repository `https://github.com/Shauryakant/CentrAlign-AI-.git` to **Render** or **Railway**.
+2. Select **Docker Runtime** (uses the included `Dockerfile`).
+3. Set environment variable `GROQ_API_KEY` in your Cloud Service dashboard.
+4. Deploy! Render/Railway will host the Web Control Dashboard, Vendor Portal, and Finance System live.
 
 ### 3. Run Task Worker via CLI
 

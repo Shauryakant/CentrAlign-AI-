@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  ai-task-worker:
+    build: .
+    container_name: ai_task_worker
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+      - "8002:8002"
+    environment:
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - GROQ_MODEL=${GROQ_MODEL:-llama-3.3-70b-versatile}
+    volumes:
+      - ./runs:/app/runs
+      - ./finance.db:/app/finance.db
+    restart: unless-stopped
