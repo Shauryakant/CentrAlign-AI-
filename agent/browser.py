@@ -161,7 +161,7 @@ class BrowserManager:
             "screenshot_path": screenshot_path
         }
 
-    async def click(self, element_id: int) -> Dict[str, Any]:
+    async def click(self, element_id: int, save_dir: Optional[str] = None) -> Dict[str, Any]:
         await self.start()
         selector = f"[data-agent-id='{element_id}']"
         try:
@@ -169,11 +169,25 @@ class BrowserManager:
             if not el:
                 return {"ok": False, "error_type": "ElementNotFound", "message": f"Element [{element_id}] not found on current page."}
             
-            # Check element metadata for approval verification
+            # Check element metadata for approval verification and download detection
             tag = await el.evaluate("el => el.tagName.toLowerCase()")
             el_type = await el.evaluate("el => el.getAttribute('type') || ''")
             el_text = await el.evaluate("el => (el.innerText || el.value || '').trim()")
+            el_href = await el.evaluate("el => el.getAttribute('href') || ''")
             is_submit_action = (tag == "button" and el_type == "submit") or "submit" in el_text.lower() or "confirm" in el_text.lower()
+            is_download_link = "download" in el_text.lower() or "download" in el_href.lower() or el_href.endswith(".pdf")
+
+            if is_download_link and save_dir:
+                os.makedirs(save_dir, exist_ok=True)
+                try:
+                    async with self.page.expect_download(timeout=10000) as download_info:
+                        await el.click(timeout=10000)
+                    download: Download = await download_info.value
+                    save_path = os.path.join(save_dir, download.suggested_filename)
+                    await download.save_as(save_path)
+                    return {"ok": True, "message": f"Clicked element [{element_id}] and downloaded file to {save_path}", "file_path": save_path, "is_submit_action": False}
+                except Exception:
+                    pass
 
             await el.click(timeout=10000)
             await self.page.wait_for_load_state("domcontentloaded", timeout=10000)

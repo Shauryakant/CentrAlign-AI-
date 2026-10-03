@@ -233,7 +233,7 @@ class ToolExecutor:
                                     "observation": snap_temp["observation"]
                                 }
 
-                res = await self.ctx.browser.click(element_id)
+                res = await self.ctx.browser.click(element_id, save_dir=self.ctx.downloads_dir)
                 snap = await self.ctx.browser.get_snapshot(self.ctx.run_dir, self.ctx.step_counter)
                 return {
                     "ok": res["ok"],
