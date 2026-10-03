@@ -123,6 +123,9 @@ def verify_run(trace_result: Dict[str, Any], pdf_path: Optional[str] = None) -> 
             mismatches.append(f"PDF Ground Truth Mismatch: PDF invoice={pdf_truth['invoice_number']} vs DB invoice={inv_number}")
         if pdf_truth.get("amount") and abs(pdf_truth["amount"] - db_amt) > 0.01:
             mismatches.append(f"PDF Ground Truth Mismatch: PDF amount={pdf_truth['amount']} vs DB amount={db_amt}")
+        pdf_due_date = str(pdf_truth.get("raw_due_date", "")).strip()
+        if pdf_due_date and pdf_due_date != db_date:
+            mismatches.append(f"PDF Ground Truth Mismatch: PDF due_date='{pdf_due_date}' vs DB due_date='{db_date}'")
 
     is_verified = len(mismatches) == 0
     verification_status = "VERIFIED_PASS" if is_verified else "FAILED_VERIFICATION"

@@ -48,6 +48,12 @@ def seed_database_and_pdfs():
     )
 
     print("Initializing SQLite Database...")
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("DROP TABLE IF EXISTS invoices")
+    conn.commit()
+    conn.close()
+    
     init_db()
 
     # Reset failure configuration

@@ -14,8 +14,9 @@ GUIDELINES & RULES:
 2. Observe page snapshots carefully. Interactive elements are numbered as `[N] <tag ...>`.
 3. If logging into vendor portal (http://127.0.0.1:8001), use username `admin` and password `password123`.
 4. After downloading/extracting PDF text, store key facts (`vendor`, `invoice_number`, `amount`, `due_date`) using `remember(fact="...")`.
-5. On the Finance System form (http://127.0.0.1:8002/invoices/new), fill ALL 5 fields (`vendor`, `invoice_number`, `amount`, `currency`, `due_date`), call `request_approval(action_description="Submit invoice INV-xxx")`, click the submit button, and call `finish(summary="...", result_data={{...}})` with structured output.
-6. Verify date format is strictly YYYY-MM-DD and amount is clean numeric (e.g. 4500.50). If facing vendor name ambiguity, call `ask_user`.
+5. On the Finance System form (http://127.0.0.1:8002/invoices/new), fill ALL 5 fields (`vendor`, `invoice_number`, `amount`, `currency`, `due_date`). Do NOT copy HTML placeholder values (e.g. placeholder="2026-10-15"); ALWAYS enter the exact values extracted from the source PDF (e.g. due_date="2026-11-01").
+6. Call `request_approval(action_description="Submit invoice INV-xxx")`, click the submit button, and call `finish(summary="...", result_data={{...}})` with structured output.
+7. Verify date format is strictly YYYY-MM-DD and amount is clean numeric (e.g. 4500.50). If facing vendor name ambiguity, call `ask_user`.
 
 CURRENT MEMORY SCRATCHPAD:
 - Facts Discovered: {facts}
