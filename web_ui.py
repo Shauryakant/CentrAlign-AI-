@@ -2,7 +2,7 @@ import asyncio
 import json
 import os
 from fastapi import FastAPI, Form, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from agent.loop import AgentRunner
 from verifier import verify_run
@@ -13,29 +13,49 @@ app = FastAPI(title="Autonomous AI Task Worker - Control Dashboard")
 os.makedirs("runs", exist_ok=True)
 app.mount("/runs", StaticFiles(directory="runs"), name="runs")
 
+@app.post("/reset-db", response_class=HTMLResponse)
+async def reset_db_endpoint():
+    from mock_apps.seed import seed_database_and_pdfs
+    import sqlite3
+    from mock_apps.finance_system import DB_PATH
+    
+    # Clear invoices table and re-seed PDFs
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("DROP TABLE IF EXISTS invoices")
+    conn.commit()
+    conn.close()
+
+    seed_database_and_pdfs()
+    return RedirectResponse(url="/?msg=Database+cleared+and+re-seeded+successfully!", status_code=303)
+
 @app.get("/", response_class=HTMLResponse)
-async def home():
-    return """
+async def home(msg: str = ""):
+    msg_html = f'<div style="background: #e6ffe6; color: #2e7d32; padding: 10px; border-radius: 4px; margin-bottom: 15px; border: 1px solid green;">{msg}</div>' if msg else ''
+    return f"""
     <!DOCTYPE html>
     <html>
     <head>
         <title>AI Task Worker - Web Control Panel</title>
         <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 30px; background: #f8f9fa; color: #333; }
-            .container { max-width: 900px; margin: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
-            h1 { color: #1a73e8; margin-top: 0; }
-            .badge { background: #e8f0fe; color: #1a73e8; padding: 4px 10px; border-radius: 12px; font-size: 0.85em; font-weight: 600; }
-            textarea { width: 100%; height: 100px; padding: 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; box-sizing: border-box; font-family: inherit; }
-            .btn { background: #1a73e8; color: white; border: none; padding: 12px 24px; font-size: 15px; font-weight: 600; border-radius: 6px; cursor: pointer; }
-            .btn:hover { background: #1557b0; }
-            .checkbox-group { margin: 15px 0; }
-            .links { margin-top: 20px; font-size: 14px; color: #666; }
-            .links a { color: #1a73e8; text-decoration: none; font-weight: 500; }
+            body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 30px; background: #f8f9fa; color: #333; }}
+            .container {{ max-width: 900px; margin: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }}
+            h1 {{ color: #1a73e8; margin-top: 0; }}
+            .badge {{ background: #e8f0fe; color: #1a73e8; padding: 4px 10px; border-radius: 12px; font-size: 0.85em; font-weight: 600; }}
+            textarea {{ width: 100%; height: 100px; padding: 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; box-sizing: border-box; font-family: inherit; }}
+            .btn {{ background: #1a73e8; color: white; border: none; padding: 12px 24px; font-size: 15px; font-weight: 600; border-radius: 6px; cursor: pointer; }}
+            .btn:hover {{ background: #1557b0; }}
+            .btn-reset {{ background: #6c757d; color: white; border: none; padding: 8px 16px; font-size: 13px; font-weight: 600; border-radius: 4px; cursor: pointer; text-decoration: none; }}
+            .btn-reset:hover {{ background: #5a6268; }}
+            .checkbox-group {{ margin: 15px 0; }}
+            .links {{ margin-top: 20px; font-size: 14px; color: #666; }}
+            .links a {{ color: #1a73e8; text-decoration: none; font-weight: 500; }}
         </style>
     </head>
     <body>
         <div class="container">
             <h1>Autonomous AI Task Worker <span class="badge">CentrAlign Prototype</span></h1>
+            {msg_html}
             <p>Enter a natural language enterprise request below to trigger the autonomous browser agent.</p>
             
             <form action="/run" method="post">
@@ -46,7 +66,13 @@ async def home():
                     <label><input type="checkbox" name="auto_approve" checked value="true"> Auto-approve form submission requests</label>
                 </div>
                 
-                <p><button type="submit" class="btn">🚀 Execute Task Worker</button></p>
+                <p>
+                    <button type="submit" class="btn">🚀 Execute Task Worker</button>
+                </p>
+            </form>
+            
+            <form action="/reset-db" method="post" style="margin-top: 10px;">
+                <button type="submit" class="btn-reset">🔄 Reset & Seed Fresh Database</button>
             </form>
 
             <div class="links">
