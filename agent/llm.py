@@ -11,7 +11,7 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 
-FALLBACK_MODELS = ["openai/gpt-oss-120b", "qwen/qwen3.8-27b"]
+FALLBACK_MODELS = ["openai/gpt-oss-120b", "qwen/qwen3.8-27b", "openai/gpt-oss-20b"]
 
 DECOMMISSIONED_MODELS = {"llama-3.3-70b-versatile", "llama-3.1-70b-versatile", "llama3-70b-8192", "llama3-8b-8192", "gemma2-9b-it", "mixtral-8x7b-32768", "llama-3.3-70b-specdec"}
 
@@ -67,12 +67,18 @@ class LLMClient:
                     return response.choices[0].message
 
                 except RateLimitError as e:
+                    last_exception = e
                     retry_after = 5.0
                     if hasattr(e, "response") and e.response and "retry-after" in e.response.headers:
                         try:
                             retry_after = float(e.response.headers["retry-after"]) + 0.5
                         except ValueError:
                             pass
+                    
+                    if retry_after > 15.0:
+                        print(f"[LLM Client] Rate limit on '{model_name}' requires long wait ({retry_after:.1f}s). Switching immediately to next available model...")
+                        break  # Immediately try next candidate model instead of blocking
+                    
                     print(f"[LLM Client] Rate limit hit (429) on {model_name}. Retrying in {retry_after:.1f}s...")
                     await asyncio.sleep(retry_after)
                     delay *= 1.5
