@@ -8,6 +8,7 @@ from rich.table import Table
 from rich.panel import Panel
 from rich.prompt import Prompt, Confirm
 from agent.loop import AgentRunner
+from verifier import verify_run
 
 console = Console()
 
@@ -49,6 +50,12 @@ async def main_async():
     with console.status("[bold green]Agent executing task...", spinner="dots"):
         result = await runner.run(args.task)
 
+    # Run Independent Verifier
+    ver_result = verify_run(result)
+    final_status = result["status"]
+    if result["status"] == "SUCCESS" and not ver_result["verified"]:
+        final_status = "FAILED_VERIFICATION"
+
     # Print Step Execution Summary Table
     table = Table(title=f"Run Execution Summary ({result['run_id']})")
     table.add_column("Step", justify="right", style="cyan")
@@ -67,15 +74,26 @@ async def main_async():
 
     console.print(table)
 
+    # Verification Report Table
+    ver_table = Table(title="Independent Verification Report (Out-of-Band)")
+    ver_table.add_column("Property", style="cyan")
+    ver_table.add_column("Status / Value", style="white")
+    
+    ver_table.add_row("Verification Result", f"[bold green]PASS[/bold green]" if ver_result["verified"] else f"[bold red]{ver_result['status']}[/bold red]")
+    ver_table.add_row("Mismatches / Violations", str(ver_result.get("mismatches", [])))
+    ver_table.add_row("DB Recorded Data", str(ver_result.get("evidence", {}).get("database_record")))
+    console.print(ver_table)
+
     # Print Final Status Panel
-    status_color = "green" if result["status"] == "SUCCESS" else "red"
+    status_color = "green" if final_status in ("SUCCESS", "VERIFIED_PASS") and ver_result["verified"] else "red"
     console.print(Panel(
-        f"[bold {status_color}]FINAL STATUS: {result['status']}[/bold {status_color}]\n\n"
+        f"[bold {status_color}]FINAL AGENT STATUS: {final_status}[/bold {status_color}]\n"
+        f"[bold {status_color}]VERIFIER STATUS: {ver_result['status']}[/bold {status_color}]\n\n"
         f"[bold white]Summary:[/bold white]\n{result['final_summary']}\n\n"
         f"[bold white]Structured Result Data:[/bold white]\n{json.dumps(result['result_data'], indent=2)}\n\n"
-        f"[bold cyan]Trace Folder:[/bold cyan] {runner.run_dir}\n"
+        f"[bold cyan]Trace Directory:[/bold cyan] {runner.run_dir}\n"
         f"[bold cyan]Total Duration:[/bold cyan] {result['total_duration_sec']}s | [bold cyan]Tokens Used:[/bold cyan] Prompt={result['total_prompt_tokens']}, Completion={result['total_completion_tokens']}",
-        title="Execution Report",
+        title="Execution & Verification Audit Report",
         border_style=status_color
     ))
 
