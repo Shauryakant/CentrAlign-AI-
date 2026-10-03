@@ -122,9 +122,9 @@ class BrowserManager:
                 counter++;
             }
 
-            let visibleText = document.body ? document.body.innerText.replace(/\\s+/g, ' ').trim() : '';
-            if (visibleText.length > 3000) {
-                visibleText = visibleText.substring(0, 3000) + '... [trimmed]';
+            let visibleText = document.body ? document.body.innerText.replace(/\s+/g, ' ').trim() : '';
+            if (visibleText.length > 1000) {
+                visibleText = visibleText.substring(0, 1000) + '... [trimmed]';
             }
 
             return {

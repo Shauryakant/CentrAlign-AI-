@@ -92,8 +92,8 @@ class AgentRunner:
             messages = [{"role": "system", "content": system_prompt}]
             messages.append({"role": "user", "content": task_prompt})
             
-            # Slice last ~6 raw messages to keep token context compact
-            recent_raw = raw_steps_history[-6:]
+            # Slice last ~4 raw messages to keep token context compact
+            recent_raw = raw_steps_history[-4:]
             messages.extend(recent_raw)
 
             step_start = time.time()
