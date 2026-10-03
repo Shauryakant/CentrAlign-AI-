@@ -15,34 +15,71 @@ class BrowserManager:
         self.element_map: Dict[int, str] = {}
 
     async def start(self):
-        if not self.playwright:
-            self.playwright = await async_playwright().start()
-            self.browser = await self.playwright.chromium.launch(headless=self.headless)
-            self.context = await self.browser.new_context(accept_downloads=True)
-            self.page = await self.context.new_page()
+        try:
+            if not self.playwright:
+                self.playwright = await async_playwright().start()
+            if not self.browser:
+                self.browser = await self.playwright.chromium.launch(headless=self.headless)
+            if not self.context:
+                self.context = await self.browser.new_context(accept_downloads=True)
+            if not self.page or self.page.is_closed():
+                self.page = await self.context.new_page()
+        except Exception as e:
+            await self.close()
+            raise RuntimeError(f"Failed to launch browser/page: {str(e)}")
 
     async def close(self):
-        if self.context:
-            await self.context.close()
-        if self.browser:
-            await self.browser.close()
-        if self.playwright:
-            await self.playwright.stop()
+        try:
+            if self.context:
+                await self.context.close()
+        except Exception:
+            pass
+        try:
+            if self.browser:
+                await self.browser.close()
+        except Exception:
+            pass
+        try:
+            if self.playwright:
+                await self.playwright.stop()
+        except Exception:
+            pass
         self.page = None
         self.context = None
         self.browser = None
         self.playwright = None
 
     async def goto(self, url: str) -> Dict[str, Any]:
-        await self.start()
         try:
+            await self.start()
+            if not self.page:
+                return {"ok": False, "error_type": "BrowserError", "message": "Browser page is not available."}
             await self.page.goto(url, wait_until="domcontentloaded", timeout=15000)
             return {"ok": True, "message": f"Navigated to {url}"}
         except Exception as e:
             return {"ok": False, "error_type": "NavigationError", "message": f"Failed to navigate to {url}: {str(e)}"}
 
     async def get_snapshot(self, run_dir: Optional[str] = None, step_num: int = 0) -> Dict[str, Any]:
-        await self.start()
+        try:
+            await self.start()
+        except Exception as e:
+            return {
+                "url": "",
+                "title": "Browser Launch Error",
+                "visible_text": f"Failed to launch browser: {str(e)}",
+                "elements": [],
+                "observation": f"Browser launch error: {str(e)}",
+                "screenshot_path": ""
+            }
+        if not self.page:
+            return {
+                "url": "",
+                "title": "Browser Page Error",
+                "visible_text": "Browser page is unavailable.",
+                "elements": [],
+                "observation": "Browser page is unavailable.",
+                "screenshot_path": ""
+            }
         js_script = """
         () => {
             document.querySelectorAll('[data-agent-id]').forEach(el => el.removeAttribute('data-agent-id'));
