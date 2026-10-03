@@ -13,6 +13,8 @@ GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 
 FALLBACK_MODELS = ["openai/gpt-oss-120b", "qwen/qwen3.8-27b"]
 
+DECOMMISSIONED_MODELS = {"llama-3.3-70b-versatile", "llama-3.1-70b-versatile", "llama3-70b-8192", "llama3-8b-8192", "gemma2-9b-it", "mixtral-8x7b-32768", "llama-3.3-70b-specdec"}
+
 class LLMClient:
     """Robust OpenAI-compatible client wrapper targeting Groq API with exponential backoff and model fallbacks."""
     
@@ -21,7 +23,11 @@ class LLMClient:
         if not key or key == "your_groq_api_key_here":
             raise ValueError("GROQ_API_KEY is not set or invalid in environment/.env file.")
         
-        self.model = model or GROQ_MODEL
+        target_model = model or GROQ_MODEL
+        if target_model in DECOMMISSIONED_MODELS:
+            target_model = "openai/gpt-oss-120b"
+
+        self.model = target_model
         self.client = AsyncOpenAI(api_key=key, base_url=GROQ_BASE_URL)
         self.total_prompt_tokens = 0
         self.total_completion_tokens = 0
