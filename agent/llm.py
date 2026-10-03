@@ -75,12 +75,13 @@ class LLMClient:
                         except ValueError:
                             pass
                     
-                    if retry_after > 15.0:
-                        print(f"[LLM Client] Rate limit on '{model_name}' requires long wait ({retry_after:.1f}s). Switching immediately to next available model...")
-                        break  # Immediately try next candidate model instead of blocking
+                    if retry_after > 15.0 and model_name != candidate_models[-1]:
+                        print(f"[LLM Client] Rate limit on '{model_name}' requires wait ({retry_after:.1f}s). Switching to next candidate model...")
+                        break  # Try next candidate model
                     
-                    print(f"[LLM Client] Rate limit hit (429) on {model_name}. Retrying in {retry_after:.1f}s...")
-                    await asyncio.sleep(retry_after)
+                    wait_time = min(retry_after, 8.0)
+                    print(f"[LLM Client] Rate limit hit (429) on {model_name}. Waiting {wait_time:.1f}s before retrying...")
+                    await asyncio.sleep(wait_time)
                     delay *= 1.5
 
                 except APIError as e:
