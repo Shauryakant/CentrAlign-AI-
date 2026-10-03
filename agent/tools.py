@@ -216,24 +216,22 @@ class ToolExecutor:
             elif name == "browser_click":
                 element_id = int(args["element_id"])
                 
-                # Pre-check if clicking submit button requires approval
-                # If approval is not granted, verify if element is a submit action
-                if not self.ctx.approval_granted:
-                    # Check element type
+                # Check approval gate for finance system database submissions
+                if not self.ctx.approval_granted and not self.ctx.auto_approve:
                     snap_temp = await self.ctx.browser.get_snapshot()
-                    matched_el = next((e for e in snap_temp["elements"] if e["id"] == element_id), None)
-                    if matched_el:
-                        tag_str = matched_el.get("tag", "").lower()
-                        text_str = matched_el.get("text", "").lower()
-                        desc_str = matched_el.get("description", "").lower()
-                        is_submit = "type=\"submit\"" in desc_str or "submit" in text_str or "submit" in desc_str
-                        if is_submit:
-                            return {
-                                "ok": False,
-                                "error_type": "ApprovalRequired",
-                                "message": f"ACTION REFUSED BY SAFETY GATE: Click on element [{element_id}] is a form submission/destructive action. You must call `request_approval` tool first and receive user approval before clicking submit.",
-                                "observation": snap_temp["observation"]
-                            }
+                    if "/invoices/new" in snap_temp["url"]:
+                        matched_el = next((e for e in snap_temp["elements"] if e["id"] == element_id), None)
+                        if matched_el:
+                            desc_str = matched_el.get("description", "").lower()
+                            text_str = matched_el.get("text", "").lower()
+                            is_submit = "type=\"submit\"" in desc_str or "submit" in text_str or "confirm" in text_str
+                            if is_submit:
+                                return {
+                                    "ok": False,
+                                    "error_type": "ApprovalRequired",
+                                    "message": f"ACTION REFUSED BY SAFETY GATE: Click on element [{element_id}] is a finance database form submission. You must call `request_approval` tool first and receive user approval before submitting.",
+                                    "observation": snap_temp["observation"]
+                                }
 
                 res = await self.ctx.browser.click(element_id)
                 snap = await self.ctx.browser.get_snapshot(self.ctx.run_dir, self.ctx.step_counter)

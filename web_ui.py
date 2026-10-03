@@ -65,7 +65,7 @@ async def home():
 async def run_task(task_prompt: str = Form(...), auto_approve: str = Form("false")):
     is_auto = auto_approve == "true"
     
-    runner = AgentRunner(auto_approve=is_auto, max_steps=15)
+    runner = AgentRunner(auto_approve=is_auto, max_steps=20)
     result = await runner.run(task_prompt)
     ver_result = verify_run(result)
 

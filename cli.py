@@ -29,7 +29,7 @@ async def main_async():
         help="Natural language task prompt"
     )
     parser.add_argument("--auto-approve", action="store_true", help="Automatically approve form submission requests")
-    parser.add_argument("--max-steps", type=int, default=15, help="Maximum step budget")
+    parser.add_argument("--max-steps", type=int, default=20, help="Maximum step budget")
     parser.add_argument("--run-id", type=str, default=None, help="Custom run ID")
 
     args = parser.parse_args()

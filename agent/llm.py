@@ -8,11 +8,13 @@ from openai import AsyncOpenAI, APIError, RateLimitError
 dotenv.load_dotenv()
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 
+FALLBACK_MODELS = ["openai/gpt-oss-120b", "qwen/qwen3.8-27b"]
+
 class LLMClient:
-    """Robust OpenAI-compatible client wrapper targeting Groq API with exponential backoff on 429."""
+    """Robust OpenAI-compatible client wrapper targeting Groq API with exponential backoff and model fallbacks."""
     
     def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
         key = api_key or GROQ_API_KEY
@@ -31,53 +33,69 @@ class LLMClient:
         max_retries: int = 5
     ) -> Any:
         delay = 2.0
-        for attempt in range(max_retries):
-            try:
-                kwargs = {
-                    "model": self.model,
-                    "messages": messages,
-                    "temperature": 0.1,
-                }
-                if tools:
-                    kwargs["tools"] = tools
-                    kwargs["tool_choice"] = "auto"
+        candidate_models = [self.model] + [m for m in FALLBACK_MODELS if m != self.model]
+        
+        last_exception = None
 
-                response = await self.client.chat.completions.create(**kwargs)
-                
-                if response.usage:
-                    self.total_prompt_tokens += response.usage.prompt_tokens or 0
-                    self.total_completion_tokens += response.usage.completion_tokens or 0
-                
-                return response.choices[0].message
+        for model_name in candidate_models:
+            for attempt in range(max_retries):
+                try:
+                    kwargs = {
+                        "model": model_name,
+                        "messages": messages,
+                        "temperature": 0.1,
+                    }
+                    if tools:
+                        kwargs["tools"] = tools
+                        kwargs["tool_choice"] = "auto"
 
-            except RateLimitError as e:
-                # Extract retry-after header if present, or exponential backoff
-                retry_after = 5.0
-                if hasattr(e, "response") and e.response and "retry-after" in e.response.headers:
-                    try:
-                        retry_after = float(e.response.headers["retry-after"]) + 0.5
-                    except ValueError:
-                        pass
-                print(f"[LLM Client] Rate limit hit (429). Retrying in {retry_after:.1f}s (Attempt {attempt + 1}/{max_retries})...")
-                await asyncio.sleep(retry_after)
-                delay *= 1.5
+                    response = await self.client.chat.completions.create(**kwargs)
+                    
+                    # Update model to the one that succeeded
+                    self.model = model_name
 
-            except APIError as e:
-                if "429" in str(e) or "rate_limit" in str(e).lower():
-                    print(f"[LLM Client] Rate limit API error. Retrying in {delay:.1f}s...")
-                    await asyncio.sleep(delay)
-                    delay *= 2.0
-                else:
+                    if response.usage:
+                        self.total_prompt_tokens += response.usage.prompt_tokens or 0
+                        self.total_completion_tokens += response.usage.completion_tokens or 0
+                    
+                    return response.choices[0].message
+
+                except RateLimitError as e:
+                    retry_after = 5.0
+                    if hasattr(e, "response") and e.response and "retry-after" in e.response.headers:
+                        try:
+                            retry_after = float(e.response.headers["retry-after"]) + 0.5
+                        except ValueError:
+                            pass
+                    print(f"[LLM Client] Rate limit hit (429) on {model_name}. Retrying in {retry_after:.1f}s...")
+                    await asyncio.sleep(retry_after)
+                    delay *= 1.5
+
+                except APIError as e:
+                    last_exception = e
+                    err_str = str(e).lower()
+                    if "404" in err_str or "model_not_found" in err_str or "decommissioned" in err_str or "does not exist" in err_str:
+                        print(f"[LLM Client] Model '{model_name}' unavailable/decommissioned ({e.message}). Trying fallback model...")
+                        break # Break inner loop to try next candidate model
+                    
+                    if "429" in err_str or "rate_limit" in err_str:
+                        print(f"[LLM Client] Rate limit API error on {model_name}. Retrying in {delay:.1f}s...")
+                        await asyncio.sleep(delay)
+                        delay *= 1.5
+                    else:
+                        if attempt == max_retries - 1:
+                            break
+                        print(f"[LLM Client] API error on {model_name}: {e}. Retrying in {delay:.1f}s...")
+                        await asyncio.sleep(delay)
+                        delay *= 1.5
+                except Exception as e:
+                    last_exception = e
                     if attempt == max_retries - 1:
-                        raise e
-                    print(f"[LLM Client] API error: {e}. Retrying in {delay:.1f}s...")
+                        break
+                    print(f"[LLM Client] Exception on {model_name}: {e}. Retrying in {delay:.1f}s...")
                     await asyncio.sleep(delay)
                     delay *= 1.5
-            except Exception as e:
-                if attempt == max_retries - 1:
-                    raise e
-                print(f"[LLM Client] Exception: {e}. Retrying in {delay:.1f}s...")
-                await asyncio.sleep(delay)
-                delay *= 1.5
 
-        raise RuntimeError("LLM request failed after max retries due to rate limits or network issues.")
+        if last_exception:
+            raise last_exception
+        raise RuntimeError("LLM request failed across all candidate models.")
